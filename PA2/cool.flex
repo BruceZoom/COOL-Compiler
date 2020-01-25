@@ -1,16 +1,17 @@
-/*
- *  The scanner definition for COOL.
- */
+/* The scanner definition or COOL. */
 
+%{
+  
 /*
  *  Stuff enclosed in %{ %} in the first section is copied verbatim to the
  *  output, so headers and global definitions are placed here to be visible
- * to the code in the file.  Don't remove anything that was here initially
+ *  to the code in the file.  Dont remove anything that was here initially
  */
-%{
+
 #include <cool-parse.h>
 #include <stringtab.h>
 #include <utilities.h>
+#include <stdint.h>
 
 /* The compiler assumes these identifiers. */
 #define yylval cool_yylval
@@ -43,13 +44,16 @@ extern YYSTYPE cool_yylval;
  *  Add Your own definitions here
  */
 
+int nested_comment_level = 0;
+
 %}
 
-/*
- * Define names for regular expressions here.
- */
+%option noyywrap
+%x LINE_COMMENT BLOCK_COMMENT
 
+/* Multiple-character operators */
 DARROW          =>
+
 
 %%
 
@@ -57,6 +61,31 @@ DARROW          =>
   *  Nested comments
   */
 
+"(\*"    {
+    BEGIN BLOCK_COMMENT;
+    printf("%d\n", nested_comment_level);
+    nested_comment_level++;
+    printf("block comment begin\n");
+}
+
+<BLOCK_COMMENT>\n { curr_lineno++; }
+<BLOCK_COMMENT>"\*)" {
+    printf("block comment end\n");
+    nested_comment_level--;
+    if (nested_comment_level == 0) BEGIN 0;
+}
+<BLOCK_COMMENT><<EOF>> {
+    strcpy(cool_yylval.error_msg, "EOF in comment");
+	  BEGIN 0;
+    return (ERROR);
+}
+
+"\*)"    {
+    strcpy(cool_yylval.error_msg, "Unmatched *)");
+    return (ERROR);
+}
+
+<BLOCK_COMMENT>. {}
 
  /*
   *  The multiple-character operators.
@@ -68,6 +97,23 @@ DARROW          =>
   * which must begin with a lower-case letter.
   */
 
+(?i:CLASS)      { return (CLASS); }
+(?i:ELSE)       { return (ELSE); }
+(?i:FI)         { return (FI); }
+(?i:IF)         { return (IF); }
+(?i:IN)         { return (IN); }
+(?i:INHERITS)   { return (INHERITS); }
+(?i:ISVOID)     { return (ISVOID); }
+(?i:LET)        { return (LET); }
+(?i:LOOP)       { return (LOOP); }
+(?i:POOL)       { return (POOL); }
+(?i:THEN)       { return (THEN); }
+(?i:WHILE)      { return (WHILE); }
+(?i:CASE)       { return (CASE); }
+(?i:ESAC)       { return (ESAC); }
+(?i:NEW)        { return (NEW); }
+(?i:OF)         { return (OF); }
+(?i:NOT)        { return (NOT); }
 
  /*
   *  String constants (C syntax)
@@ -75,6 +121,5 @@ DARROW          =>
   *  \n \t \b \f, the result is c.
   *
   */
-
 
 %%
